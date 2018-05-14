@@ -72,7 +72,7 @@ def archive_model(serialization_dir: str,
             fta_file.write(json.dumps(files_to_archive))
 
     if archive_file is None or len(archive_file) == 0:
-        archive_file = os.path.join(serialization_dir, _ARCHIVE_FILE_BASE_NAME)
+        archive_file = os.path.join(serialization_dir, ARCHIVE_FILE_BASE_NAME_DEFAULT)
 
     logger.info("archiving weights and vocabulary to %s", archive_file)
     with tarfile.open(archive_file, 'w:gz') as archive:
