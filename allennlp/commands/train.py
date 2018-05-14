@@ -302,18 +302,23 @@ def train_model(params: Params,
     archive_model(serialization_dir, files_to_archive=params.files_to_archive, archive_file=archive_file)
 
     # save metrics (in case that eval on test_data) fails
+    logging.info("Saving matrics before test evaluation...")
     metrics_json = json.dumps(metrics, indent=2)
     with open(os.path.join(serialization_dir, "metrics.json"), "w") as metrics_file:
         metrics_file.write(metrics_json)
     logger.info("Metrics: %s", metrics_json)
 
+
     if test_data and evaluate_on_test:
+        logging.info("=" * 10)
+        logging.info("Evaluating on test with the best model...")
         # Evaluate on test with the best params.
         archive = load_archive(archive_file)
         config = archive.config
         prepare_environment(config)
         model = archive.model
         model.eval()
+
 
         test_metrics = evaluate(model, test_data, iterator, cuda_device=trainer._cuda_devices[0])  # pylint: disable=protected-access
         for key, value in test_metrics.items():
