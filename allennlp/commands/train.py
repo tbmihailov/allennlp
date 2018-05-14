@@ -47,7 +47,7 @@ from allennlp.data import Vocabulary
 from allennlp.data.instance import Instance
 from allennlp.data.dataset_readers.dataset_reader import DatasetReader
 from allennlp.data.iterators.data_iterator import DataIterator
-from allennlp.models.archival import archive_model, CONFIG_NAME
+from allennlp.models.archival import archive_model, CONFIG_NAME, load_archive, ARCHIVE_FILE_BASE_NAME_DEFAULT
 from allennlp.models.model import Model, _DEFAULT_WEIGHTS
 from allennlp.training.trainer import Trainer
 
@@ -298,9 +298,12 @@ def train_model(params: Params,
         raise
 
     # Now tar up results
-    archive_model(serialization_dir, files_to_archive=params.files_to_archive)
+    archive_file = os.path.join(serialization_dir, ARCHIVE_FILE_BASE_NAME_DEFAULT)
+    archive_model(serialization_dir, files_to_archive=params.files_to_archive, archive_file=archive_file)
 
     if test_data and evaluate_on_test:
+        # Evaluate on test with the best params.
+        model = load_archive(archive_file)
         test_metrics = evaluate(model, test_data, iterator, cuda_device=trainer._cuda_devices[0])  # pylint: disable=protected-access
         for key, value in test_metrics.items():
             metrics["test_" + key] = value
