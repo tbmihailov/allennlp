@@ -301,6 +301,12 @@ def train_model(params: Params,
     archive_file = os.path.join(serialization_dir, ARCHIVE_FILE_BASE_NAME_DEFAULT)
     archive_model(serialization_dir, files_to_archive=params.files_to_archive, archive_file=archive_file)
 
+    # save metrics (in case that eval on test_data) fails
+    metrics_json = json.dumps(metrics, indent=2)
+    with open(os.path.join(serialization_dir, "metrics.json"), "w") as metrics_file:
+        metrics_file.write(metrics_json)
+    logger.info("Metrics: %s", metrics_json)
+
     if test_data and evaluate_on_test:
         # Evaluate on test with the best params.
         archive = load_archive(archive_file)
