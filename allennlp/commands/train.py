@@ -303,8 +303,12 @@ def train_model(params: Params,
 
     if test_data and evaluate_on_test:
         # Evaluate on test with the best params.
-        model = load_archive(archive_file)
-        test_metrics = evaluate(model, test_data, iterator, cuda_device=trainer._cuda_devices[0])  # pylint: disable=protected-access
+        model_archive = load_archive(archive_file)
+        del model
+        model = model_archive.model
+        model.eval()
+
+        test_metrics = evaluate(model_archive.model, test_data, iterator, cuda_device=trainer._cuda_devices[0])  # pylint: disable=protected-access
         for key, value in test_metrics.items():
             metrics["test_" + key] = value
 
