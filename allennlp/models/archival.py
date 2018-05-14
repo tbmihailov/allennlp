@@ -31,10 +31,13 @@ Archive = NamedTuple("Archive", [("model", Model), ("config", Params)])
 CONFIG_NAME = "config.json"
 _WEIGHTS_NAME = "weights.th"
 _FTA_NAME = "files_to_archive.json"
+ARCHIVE_FILE_BASE_NAME_DEFAULT = "model.tar.gz"
 
 def archive_model(serialization_dir: str,
                   weights: str = _DEFAULT_WEIGHTS,
-                  files_to_archive: Dict[str, str] = None) -> None:
+                  files_to_archive: Dict[str, str] = None,
+                  archive_file: str = None
+                  ) -> None:
     """
     Archive the model weights, its training configuration, and its
     vocabulary to `model.tar.gz`. Include the additional ``files_to_archive``
@@ -49,6 +52,8 @@ def archive_model(serialization_dir: str,
     files_to_archive: ``Dict[str, str]``, optional (default=None)
         A mapping {hocon_key -> filename} of supplementary files to include
         in the archive.
+    archive_file: ``str``, optional (default=None)
+        The name of the output archive file.
     """
     weights_file = os.path.join(serialization_dir, weights)
     if not os.path.exists(weights_file):
@@ -66,8 +71,9 @@ def archive_model(serialization_dir: str,
         with open(fta_filename, 'w') as fta_file:
             fta_file.write(json.dumps(files_to_archive))
 
+    if archive_file is None or len(archive_file) == 0:
+        archive_file = os.path.join(serialization_dir, _ARCHIVE_FILE_BASE_NAME)
 
-    archive_file = os.path.join(serialization_dir, "model.tar.gz")
     logger.info("archiving weights and vocabulary to %s", archive_file)
     with tarfile.open(archive_file, 'w:gz') as archive:
         archive.add(config_file, arcname=CONFIG_NAME)
