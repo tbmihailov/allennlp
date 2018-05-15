@@ -148,7 +148,14 @@ def get_final_encoder_states(encoder_outputs: torch.Tensor,
     # These are the indices of the last words in the sequences (i.e. length sans padding - 1).  We
     # are assuming sequences are right padded.
     # Shape: (batch_size,)
-    last_word_indices = mask.sum(1).long() - 1
+    last_word_indices = mask.sum(1).long()
+
+    # Substract 1 for last axis sequences with len > 0. Some last axis values can be all zeros (3D padding).
+    # In this case we still want to return results since the encoder endoded the representation with zeros anyway.
+    # last_word_indices_offset - returns 1 if > 0, 0 if <= 0
+    last_word_indices_offset = (last_word_indices > 0).long()
+    last_word_indices = last_word_indices - last_word_indices_offset
+
     batch_size, _, encoder_output_dim = encoder_outputs.size()
     expanded_indices = last_word_indices.view(-1, 1, 1).expand(batch_size, 1, encoder_output_dim)
     # Shape: (batch_size, 1, encoder_output_dim)
@@ -158,6 +165,12 @@ def get_final_encoder_states(encoder_outputs: torch.Tensor,
         final_forward_output = final_encoder_output[:, :(encoder_output_dim // 2)]
         final_backward_output = encoder_outputs[:, 0, (encoder_output_dim // 2):]
         final_encoder_output = torch.cat([final_forward_output, final_backward_output], dim=-1)
+
+    # Mask the output for all-zeros mask sequences.
+    # If encoder_outputs are really encoder output all-zeros pad sequences should already be zeros
+    # but it is better to mask it to cover the case when they are not.
+    final_encoder_output = last_word_indices_offset.unsqueeze(-1).float() * final_encoder_output
+
     return final_encoder_output
 
 
