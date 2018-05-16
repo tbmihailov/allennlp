@@ -314,7 +314,7 @@ def train_model(params: Params,
         logging.info("Evaluating on test with the best model...")
         logging.info("Fix 2018-05-16-02-39 PM")
         # Load saved archive to get same results as "evaluate" method
-        archive = load_archive(archive_file)
+        archive = load_archive(archive_file, cuda_device=trainer._cuda_devices[0])
         del model
         model = archive.model
         model.eval()
