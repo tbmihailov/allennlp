@@ -316,7 +316,7 @@ def train_model(params: Params,
         # Load saved archive to get same results as "evaluate" method
         archive = load_archive(archive_file)
         config = archive.config
-        prepare_environment(config)
+        #prepare_environment(config)
         model = archive.model
         model.eval()
 
