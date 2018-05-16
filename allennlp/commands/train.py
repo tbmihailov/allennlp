@@ -315,12 +315,11 @@ def train_model(params: Params,
 
         # Load saved archive to get same results as "evaluate" method
         archive = load_archive(archive_file)
-        config = archive.config
-        #prepare_environment(config)
+        del model
         model = archive.model
         model.eval()
 
-        test_metrics = evaluate(model, test_data, iterator, cuda_device=trainer._cuda_devices[0])  # pylint: disable=protected-access
+        test_metrics = evaluate(archive.model, test_data, iterator, cuda_device=trainer._cuda_devices[0])  # pylint: disable=protected-access
         for key, value in test_metrics.items():
             metrics["test_" + key] = value
 
