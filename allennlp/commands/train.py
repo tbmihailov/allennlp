@@ -312,7 +312,7 @@ def train_model(params: Params,
     if test_data and evaluate_on_test:
         logging.info("===" * 10)
         logging.info("Evaluating on test with the best model...")
-
+        logging.info("Fix 2018-05-16-02-39 PM")
         # Load saved archive to get same results as "evaluate" method
         archive = load_archive(archive_file)
         del model
