@@ -32,6 +32,10 @@ class FeedForward(torch.nn.Module):
     dropout : ``Union[float, Sequence[float]]``, optional
         If given, we will apply this amount of dropout after each layer.  Semantics of ``float``
         versus ``Sequence[float]`` is the same as with other parameters.
+    biases : ``Union[bool, Sequence[bool]]``, optional,
+        Default is True for all layers.
+        If given, we will specify bias for each of the layers.  Semantics of ``bool``
+        versus ``Sequence[bool]`` is the same as with other parameters.
     """
     def __init__(self,
                  input_dim: int,
