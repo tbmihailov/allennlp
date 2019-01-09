@@ -116,7 +116,7 @@ class _EncoderBase(torch.nn.Module):
         module.flatten_parameters()
         
         # Actually call the module on the sorted PackedSequence.
-        imodule_output, final_states = module(packed_sequence_input, initial_states)
+        module_output, final_states = module(packed_sequence_input, initial_states)
 
         return module_output, final_states, restoration_indices
 
