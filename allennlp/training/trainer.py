@@ -61,7 +61,10 @@ class Trainer(TrainerBase):
                  should_log_parameter_statistics: bool = True,
                  should_log_learning_rate: bool = False,
                  log_batch_size_period: Optional[int] = None,
-                 moving_average: Optional[MovingAverage] = None) -> None:
+                 moving_average: Optional[MovingAverage] = None,
+                 accumulation_steps: Optional[int] = 1,
+                 normalize_loss_with_accumulation_steps: Optional[bool] = False,
+                 ) -> None:
         """
         A trainer for doing supervised learning. It just takes a labeled dataset
         and a ``DataIterator``, and uses the supplied ``Optimizer`` to learn the weights
@@ -167,6 +170,13 @@ class Trainer(TrainerBase):
             parameters. Be careful that when saving the checkpoint, we will save the moving averages of
             parameters. This is necessary because we want the saved model to perform as well as the validated
             model if we load it later. But this may cause problems if you restart the training from checkpoint.
+        accumulation_steps : ``int``, optional, (default = ``1``)
+            Number of steps to make before update the parameters with computed gradients. For each batch, the computed
+            gradients are stored and updated every accumulation steps. This allows to train a network with a higher
+            actual batch_size: basically batch_size * accumulation_steps.
+        normalize_loss_with_accumulation_steps : ``bool``, optional, (default = ``True``)
+            If ``True``, the loss is normalized by the number of steps.
+            loss_for_gradients = computed_loss_for_curr_step / accumulaiton_steps
         """
         super().__init__(serialization_dir, cuda_device)
 
@@ -195,6 +205,11 @@ class Trainer(TrainerBase):
         self._validation_metric = validation_metric[1:]
 
         self._num_epochs = num_epochs
+
+        if accumulation_steps < 1:
+            raise ValueError("accumulation_steps should be greater or equal to 1!")
+        self._accumulation_steps = accumulation_steps
+        self._normalize_loss_with_accumulation_steps = normalize_loss_with_accumulation_steps
 
         self._checkpointer = Checkpointer(serialization_dir,
                                           keep_serialized_model_every_num_seconds,
@@ -295,15 +310,21 @@ class Trainer(TrainerBase):
         logger.info("Training")
         train_generator_tqdm = Tqdm.tqdm(train_generator,
                                          total=num_training_batches)
+
+        accumulation_steps = self._accumulation_steps
         cumulative_batch_size = 0
         for batch_group in train_generator_tqdm:
             batches_this_epoch += 1
             self._batch_num_total += 1
             batch_num_total = self._batch_num_total
 
-            self.optimizer.zero_grad()
+            if (batches_this_epoch - 1) % accumulation_steps == 0:
+                # The current batch is the 0 step from the epoch or int the previous step optimizer.step() is called
+                self.optimizer.zero_grad()
 
             loss = self.batch_loss(batch_group, for_training=True)
+            if accumulation_steps > 1 and self._normalize_loss_with_accumulation_steps:
+                loss = loss / accumulation_steps
 
             if torch.isnan(loss):
                 raise ValueError("nan loss encountered")
@@ -327,7 +348,10 @@ class Trainer(TrainerBase):
                 # and copy them to CPU so large models won't go OOM on the GPU.
                 param_updates = {name: param.detach().cpu().clone()
                                  for name, param in self.model.named_parameters()}
-                self.optimizer.step()
+
+                if batches_this_epoch % accumulation_steps == 0:
+                    self.optimizer.step()
+
                 for name, param in self.model.named_parameters():
                     param_updates[name].sub_(param.detach().cpu())
                     update_norm = torch.norm(param_updates[name].view(-1, ))
@@ -335,7 +359,8 @@ class Trainer(TrainerBase):
                     self._tensorboard.add_train_scalar("gradient_update/" + name,
                                                        update_norm / (param_norm + 1e-7))
             else:
-                self.optimizer.step()
+                if batches_this_epoch % self._accumulation_steps == 0:
+                    self.optimizer.step()
 
             # Update moving averages
             if self._moving_average is not None:
@@ -362,7 +387,7 @@ class Trainer(TrainerBase):
                 cur_batch = sum([training_util.get_batch_size(batch) for batch in batch_group])
                 cumulative_batch_size += cur_batch
                 if (batches_this_epoch - 1) % self._log_batch_size_period == 0:
-                    average = cumulative_batch_size/batches_this_epoch
+                    average = cumulative_batch_size / batches_this_epoch
                     logger.info(f"current batch size: {cur_batch} mean batch size: {average}")
                     self._tensorboard.add_train_scalar("current_batch_size", cur_batch)
                     self._tensorboard.add_train_scalar("mean_batch_size", average)
