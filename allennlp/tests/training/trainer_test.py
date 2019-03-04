@@ -92,6 +92,59 @@ class TestTrainer(AllenNlpTestCase):
         assert isinstance(metrics['peak_cpu_memory_MB'], float)
         assert metrics['peak_cpu_memory_MB'] > 0
 
+    def test_trainer_can_run_with_accumulation_steps(self):
+        
+        # Trainer with batch size 4
+        iterator_bs4 = BasicIterator(batch_size=4)
+        iterator_bs4.index_with(self.vocab)
+
+        trainer = Trainer(model=self.model,
+                          optimizer=self.optimizer,
+                          iterator=iterator_bs4,
+                          train_dataset=self.instances,
+                          validation_dataset=self.instances,
+                          num_epochs=2,
+                          accumulation_steps=1,
+                          normalize_loss_with_accumulation_steps=False
+                          )
+        
+        metrics_bs4 = trainer.train()
+        assert 'best_validation_loss' in metrics_bs4
+        assert isinstance(metrics_bs4['best_validation_loss'], float)
+        assert 'best_validation_accuracy' in metrics_bs4
+        assert isinstance(metrics_bs4['best_validation_accuracy'], float)
+        assert 'best_validation_accuracy3' in metrics_bs4
+        assert isinstance(metrics_bs4['best_validation_accuracy3'], float)
+        assert 'best_epoch' in metrics_bs4
+        assert isinstance(metrics_bs4['best_epoch'], int)
+
+        # Trainer with batch size 2 and accumulation steps 2
+        iterator_bs2 = BasicIterator(batch_size=2)
+        iterator_bs2.index_with(self.vocab)
+
+        trainer = Trainer(model=self.model,
+                          optimizer=self.optimizer,
+                          iterator=iterator_bs2,
+                          train_dataset=self.instances,
+                          validation_dataset=self.instances,
+                          num_epochs=2,
+                          accumulation_steps=2,
+                          normalize_loss_with_accumulation_steps=False
+                          )
+        metrics_bs2_accum_step2 = trainer.train()
+        assert 'best_validation_loss' in metrics_bs2_accum_step2
+        assert isinstance(metrics_bs2_accum_step2['best_validation_loss'], float)
+        assert 'best_validation_accuracy' in metrics_bs2_accum_step2
+        assert isinstance(metrics_bs2_accum_step2['best_validation_accuracy'], float)
+        assert 'best_validation_accuracy3' in metrics_bs2_accum_step2
+        assert isinstance(metrics_bs2_accum_step2['best_validation_accuracy3'], float)
+        assert 'best_epoch' in metrics_bs2_accum_step2
+        assert isinstance(metrics_bs2_accum_step2['best_epoch'], int)
+
+        assert metrics_bs4["training_loss"] == pytest.approx(metrics_bs2_accum_step2["training_loss"], 0.02)
+
+
+
     def test_trainer_can_run_exponential_moving_average(self):
         moving_average = ExponentialMovingAverage(self.model.named_parameters(), decay=0.9999)
         trainer = Trainer(model=self.model,
@@ -555,7 +608,7 @@ class TestTrainer(AllenNlpTestCase):
         epoch = restore_trainer._restore_checkpoint()
         assert epoch == 2
         # One batch per epoch.
-        assert restore_trainer._batch_num_total == 2
+        assert restore_trainer._update_steps_num_total == 2
 
     def test_trainer_from_base_class_params(self):
         params = Params.from_file(self.FIXTURES_ROOT / 'simple_tagger' / 'experiment.json')
