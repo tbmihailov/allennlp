@@ -227,10 +227,10 @@ class Trainer(TrainerBase):
         # We keep the total batch number as an instance variable because it
         # is used inside a closure for the hook which logs activations in
         # ``_enable_activation_logging``.
-        self._batch_num_total = 0
+        self._update_steps_num_total = 0
 
         self._tensorboard = TensorboardWriter(
-                get_batch_num_total=lambda: self._batch_num_total,
+                get_batch_num_total=lambda: self._update_steps_num_total,
                 serialization_dir=serialization_dir,
                 summary_interval=summary_interval,
                 histogram_interval=histogram_interval,
@@ -301,8 +301,8 @@ class Trainer(TrainerBase):
         last_save_time = time.time()
 
         batches_this_epoch = 0
-        if self._batch_num_total is None:
-            self._batch_num_total = 0
+        if self._update_steps_num_total is None:
+            self._update_steps_num_total = 0
 
         histogram_parameters = set(self.model.get_parameters_for_histogram_tensorboard_logging())
 
@@ -313,19 +313,10 @@ class Trainer(TrainerBase):
         accumulation_steps = self._accumulation_steps
         cumulative_batch_size = 0
         update_steps_this_epoch = 0
+
+        self.optimizer.zero_grad()
         for batch_group in train_generator_tqdm:
             batches_this_epoch += 1
-
-            weights_update_in_last_batch = (batches_this_epoch - 1) % accumulation_steps == 0
-            if weights_update_in_last_batch:
-                self._batch_num_total += 1
-                batch_num_total = self._batch_num_total
-
-            # The current batch is the 0 step from the epoch or int the previous step optimizer.step() is called
-            if weights_update_in_last_batch:
-                self.optimizer.zero_grad()
-
-            update_weights_in_this_batch = batches_this_epoch == num_training_batches or batches_this_epoch % accumulation_steps == 0
 
             loss = self.batch_loss(batch_group, for_training=True)
             if accumulation_steps > 1 and self._normalize_loss_with_accumulation_steps:
@@ -337,6 +328,15 @@ class Trainer(TrainerBase):
             loss.backward()
 
             train_loss += loss.item()
+
+            # Weights update
+            update_weights_in_this_batch = batches_this_epoch == num_training_batches or batches_this_epoch % accumulation_steps == 0
+            if not update_weights_in_this_batch:
+                continue
+
+            self._update_steps_num_total += 1
+
+            batch_num_total = self._update_steps_num_total
 
             batch_grad_norm = self.rescale_gradients()
 
@@ -354,9 +354,10 @@ class Trainer(TrainerBase):
                 param_updates = {name: param.detach().cpu().clone()
                                  for name, param in self.model.named_parameters()}
 
-                if update_weights_in_this_batch == 0:
-                    self.optimizer.step()
-                    update_steps_this_epoch += 1
+                self.optimizer.step()
+                update_steps_this_epoch += 1
+                # The current batch is the 0 step from the epoch or int the previous step optimizer.step() is called
+                self.optimizer.zero_grad()
 
                 for name, param in self.model.named_parameters():
                     param_updates[name].sub_(param.detach().cpu())
@@ -365,13 +366,13 @@ class Trainer(TrainerBase):
                     self._tensorboard.add_train_scalar("gradient_update/" + name,
                                                        update_norm / (param_norm + 1e-7))
             else:
-                if update_weights_in_this_batch == 0:
-                    self.optimizer.step()
-                    update_steps_this_epoch += 1
+                self.optimizer.step()
+                update_steps_this_epoch += 1
+                self.optimizer.zero_grad()
 
             # Update moving averages
             if self._moving_average is not None and update_weights_in_this_batch:
-                self._moving_average.apply(self._batch_num_total)
+                self._moving_average.apply(self._update_steps_num_total)
 
             # Update the description with the latest metrics
             metrics = training_util.get_metrics(self.model, train_loss, batches_this_epoch)
@@ -594,7 +595,7 @@ class Trainer(TrainerBase):
         training_states = {
                 "metric_tracker": self._metric_tracker.state_dict(),
                 "optimizer": self.optimizer.state_dict(),
-                "batch_num_total": self._batch_num_total,
+                "batch_num_total": self._update_steps_num_total,
         }
 
         # If we have a learning rate or momentum scheduler, we should persist them too.
@@ -665,7 +666,7 @@ class Trainer(TrainerBase):
         # it is unchanged.
         batch_num_total = training_state.get('batch_num_total')
         if batch_num_total is not None:
-            self._batch_num_total = batch_num_total
+            self._update_steps_num_total = batch_num_total
 
         return epoch_to_return
 
