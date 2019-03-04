@@ -306,21 +306,26 @@ class Trainer(TrainerBase):
 
         histogram_parameters = set(self.model.get_parameters_for_histogram_tensorboard_logging())
 
-
         logger.info("Training")
         train_generator_tqdm = Tqdm.tqdm(train_generator,
                                          total=num_training_batches)
 
         accumulation_steps = self._accumulation_steps
         cumulative_batch_size = 0
+        update_steps_this_epoch = 0
         for batch_group in train_generator_tqdm:
             batches_this_epoch += 1
-            self._batch_num_total += 1
-            batch_num_total = self._batch_num_total
 
-            if (batches_this_epoch - 1) % accumulation_steps == 0:
-                # The current batch is the 0 step from the epoch or int the previous step optimizer.step() is called
+            weights_update_in_last_batch = (batches_this_epoch - 1) % accumulation_steps == 0
+            if weights_update_in_last_batch:
+                self._batch_num_total += 1
+                batch_num_total = self._batch_num_total
+
+            # The current batch is the 0 step from the epoch or int the previous step optimizer.step() is called
+            if weights_update_in_last_batch:
                 self.optimizer.zero_grad()
+
+            update_weights_in_this_batch = batches_this_epoch == num_training_batches or batches_this_epoch % accumulation_steps == 0
 
             loss = self.batch_loss(batch_group, for_training=True)
             if accumulation_steps > 1 and self._normalize_loss_with_accumulation_steps:
@@ -349,8 +354,9 @@ class Trainer(TrainerBase):
                 param_updates = {name: param.detach().cpu().clone()
                                  for name, param in self.model.named_parameters()}
 
-                if batches_this_epoch % accumulation_steps == 0:
+                if update_weights_in_this_batch == 0:
                     self.optimizer.step()
+                    update_steps_this_epoch += 1
 
                 for name, param in self.model.named_parameters():
                     param_updates[name].sub_(param.detach().cpu())
@@ -359,12 +365,13 @@ class Trainer(TrainerBase):
                     self._tensorboard.add_train_scalar("gradient_update/" + name,
                                                        update_norm / (param_norm + 1e-7))
             else:
-                if batches_this_epoch % self._accumulation_steps == 0:
+                if update_weights_in_this_batch == 0:
                     self.optimizer.step()
+                    update_steps_this_epoch += 1
 
             # Update moving averages
-            if self._moving_average is not None:
-                self._moving_average.apply(batch_num_total)
+            if self._moving_average is not None and update_weights_in_this_batch:
+                self._moving_average.apply(self._batch_num_total)
 
             # Update the description with the latest metrics
             metrics = training_util.get_metrics(self.model, train_loss, batches_this_epoch)
@@ -587,7 +594,7 @@ class Trainer(TrainerBase):
         training_states = {
                 "metric_tracker": self._metric_tracker.state_dict(),
                 "optimizer": self.optimizer.state_dict(),
-                "batch_num_total": self._batch_num_total
+                "batch_num_total": self._batch_num_total,
         }
 
         # If we have a learning rate or momentum scheduler, we should persist them too.
