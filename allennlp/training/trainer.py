@@ -726,6 +726,9 @@ class Trainer(TrainerBase):
         should_log_learning_rate = params.pop_bool("should_log_learning_rate", False)
         log_batch_size_period = params.pop_int("log_batch_size_period", None)
 
+        accumulation_steps = params.pop_int("accumulation_steps", 1)
+        normalize_loss_with_accumulation_steps = params.pop_int("normalize_loss_with_accumulation_steps", False)
+
         params.assert_empty(cls.__name__)
         return cls(model, optimizer, iterator,
                    train_data, validation_data,
@@ -748,7 +751,10 @@ class Trainer(TrainerBase):
                    should_log_parameter_statistics=should_log_parameter_statistics,
                    should_log_learning_rate=should_log_learning_rate,
                    log_batch_size_period=log_batch_size_period,
-                   moving_average=moving_average)
+                   moving_average=moving_average,
+                   accumulation_steps=accumulation_steps,
+                   normalize_loss_with_accumulation_steps=normalize_loss_with_accumulation_steps
+                   )
 
 
 class TrainerPieces(NamedTuple):
