@@ -105,7 +105,7 @@ class TestTrainer(AllenNlpTestCase):
                           validation_dataset=self.instances,
                           num_epochs=2,
                           accumulation_steps=1,
-                          normalize_loss_with_accumulation_steps=False
+                          normalize_loss_with_accumulation_steps=True
                           )
         
         metrics_bs4 = trainer.train()
@@ -129,7 +129,7 @@ class TestTrainer(AllenNlpTestCase):
                           validation_dataset=self.instances,
                           num_epochs=2,
                           accumulation_steps=2,
-                          normalize_loss_with_accumulation_steps=False
+                          normalize_loss_with_accumulation_steps=True
                           )
         metrics_bs2_accum_step2 = trainer.train()
         assert 'best_validation_loss' in metrics_bs2_accum_step2

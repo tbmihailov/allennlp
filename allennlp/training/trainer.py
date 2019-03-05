@@ -63,7 +63,7 @@ class Trainer(TrainerBase):
                  log_batch_size_period: Optional[int] = None,
                  moving_average: Optional[MovingAverage] = None,
                  accumulation_steps: Optional[int] = 1,
-                 normalize_loss_with_accumulation_steps: Optional[bool] = False,
+                 normalize_loss_with_accumulation_steps: Optional[bool] = True,
                  ) -> None:
         """
         A trainer for doing supervised learning. It just takes a labeled dataset
