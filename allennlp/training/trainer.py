@@ -727,7 +727,7 @@ class Trainer(TrainerBase):
         log_batch_size_period = params.pop_int("log_batch_size_period", None)
 
         accumulation_steps = params.pop_int("accumulation_steps", 1)
-        normalize_loss_with_accumulation_steps = params.pop_int("normalize_loss_with_accumulation_steps", False)
+        normalize_loss_with_accumulation_steps = params.pop_bool("normalize_loss_with_accumulation_steps", True)
 
         params.assert_empty(cls.__name__)
         return cls(model, optimizer, iterator,
