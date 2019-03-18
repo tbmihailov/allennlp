@@ -375,7 +375,8 @@ class Trainer(TrainerBase):
                 self._moving_average.apply(self._update_steps_num_total)
 
             # Update the description with the latest metrics
-            metrics = training_util.get_metrics(self.model, train_loss, update_steps_this_epoch)
+            normalize_loss_steps = update_steps_this_epoch if accumulation_steps > 1 and self._normalize_loss_with_accumulation_steps else batches_this_epoch
+            metrics = training_util.get_metrics(self.model, train_loss, normalize_loss_steps)
             description = training_util.description_from_metrics(metrics)
 
             train_generator_tqdm.set_description(description, refresh=False)
