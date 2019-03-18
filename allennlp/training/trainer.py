@@ -375,7 +375,7 @@ class Trainer(TrainerBase):
                 self._moving_average.apply(self._update_steps_num_total)
 
             # Update the description with the latest metrics
-            metrics = training_util.get_metrics(self.model, train_loss, batches_this_epoch)
+            metrics = training_util.get_metrics(self.model, train_loss, update_steps_this_epoch)
             description = training_util.description_from_metrics(metrics)
 
             train_generator_tqdm.set_description(description, refresh=False)
