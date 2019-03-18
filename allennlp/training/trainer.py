@@ -327,7 +327,12 @@ class Trainer(TrainerBase):
 
             loss.backward()
 
-            train_loss += loss.item()
+            # Log the step loss
+            step_loss_to_log = loss.item()
+            if accumulation_steps > 1 and self._normalize_loss_with_accumulation_steps:
+                step_loss_to_log = step_loss_to_log * accumulation_steps
+
+            train_loss += step_loss_to_log
 
             # Weights update
             update_weights_in_this_batch = batches_this_epoch == num_training_batches or batches_this_epoch % accumulation_steps == 0
@@ -375,8 +380,8 @@ class Trainer(TrainerBase):
                 self._moving_average.apply(self._update_steps_num_total)
 
             # Update the description with the latest metrics
-            normalize_loss_steps = update_steps_this_epoch if accumulation_steps > 1 and self._normalize_loss_with_accumulation_steps else batches_this_epoch
-            metrics = training_util.get_metrics(self.model, train_loss, normalize_loss_steps)
+
+            metrics = training_util.get_metrics(self.model, train_loss, batches_this_epoch)
             description = training_util.description_from_metrics(metrics)
 
             train_generator_tqdm.set_description(description, refresh=False)
